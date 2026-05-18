@@ -24,6 +24,24 @@ class RestaurantService {
     return await Geolocator.getCurrentPosition();
   }
 
+  static Future<Map<String, dynamic>> getRegisteredRestaurants({
+    double lat = 4.7110,
+    double lng = -74.0721,
+    double radius = 5.0,
+  }) async {
+    final token = await ApiService.getToken();
+    final response = await http.get(
+      Uri.parse('$_base/restaurants?lat=$lat&lng=$lng&radius=$radius&size=20'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Position> getCurrentPosition() => _getLocation();
+
   static Future<Map<String, dynamic>> getRestaurants({
     double radius = 5.0,
   }) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/favorite_service.dart';
+import '../services/reservation_service.dart';
 
 class RestaurantScreen extends StatefulWidget {
   final Map<String, dynamic> restaurant;
@@ -25,6 +26,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   String get _openingHours =>
       widget.restaurant['openingHours'] ?? 'Horario no disponible';
   String get _phone => widget.restaurant['phone'] ?? 'No disponible';
+  bool get _isRegistered => widget.restaurant['isRegistered'] == true;
 
   @override
   void initState() {
@@ -46,6 +48,20 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
     setState(() => _isFavorite = !_isFavorite);
   }
 
+  void _showReservationSheet() {
+    final restaurantId = widget.restaurant['id'] as String?;
+    if (restaurantId == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) =>
+          ReservationSheet(restaurantId: restaurantId, restaurantName: _name),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,7 +73,8 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
             _buildHeader(context),
             _buildInfo(),
             _buildStatsRow(),
-            _buildInfoCard(),
+            _buildStatusCard(),
+            if (_isRegistered) _buildReserveButton(),
             const SizedBox(height: 32),
           ],
         ),
@@ -72,7 +89,8 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
           height: 220,
           width: double.infinity,
           child: Image.network(
-            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
+            widget.restaurant['imageUrl'] ??
+                'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
               height: 220,
@@ -279,40 +297,329 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildStatusCard() {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.08),
+        color: _isRegistered
+            ? Colors.green.withOpacity(0.08)
+            : primaryColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primaryColor.withOpacity(0.15)),
+        border: Border.all(
+          color: _isRegistered
+              ? Colors.green.withOpacity(0.15)
+              : primaryColor.withOpacity(0.15),
+        ),
       ),
       child: Row(
         children: [
-          const Text('🔵', style: TextStyle(fontSize: 20)),
+          Text(
+            _isRegistered ? '🟢' : '🔵',
+            style: const TextStyle(fontSize: 20),
+          ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Restaurante del barrio',
-                  style: TextStyle(
+                  _isRegistered
+                      ? 'Registrado en FOODIK'
+                      : 'Restaurante del barrio',
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: darkColor,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Este restaurante aún no está registrado en FOODIK. Solo puedes ver su información.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                  _isRegistered
+                      ? 'Puedes hacer reservas y ver el menú completo.'
+                      : 'Este restaurante aún no está registrado en FOODIK.',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildReserveButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _showReservationSheet,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: const Text(
+            'Reservar una mesa',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ReservationSheet extends StatefulWidget {
+  final String restaurantId;
+  final String restaurantName;
+  const ReservationSheet({
+    super.key,
+    required this.restaurantId,
+    required this.restaurantName,
+  });
+
+  @override
+  State<ReservationSheet> createState() => _ReservationSheetState();
+}
+
+class _ReservationSheetState extends State<ReservationSheet> {
+  int _partySize = 2;
+  DateTime _date = DateTime.now();
+  List<dynamic> _slots = [];
+  bool _loading = false;
+  String? _selectedSlotId;
+  bool _booking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSlots();
+  }
+
+  Future<void> _loadSlots() async {
+    setState(() => _loading = true);
+    final dateStr =
+        '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
+    final response = await ReservationService.getAvailability(
+      widget.restaurantId,
+      dateStr,
+      _partySize,
+    );
+    setState(() {
+      _slots = response['data'] as List? ?? [];
+      _loading = false;
+      _selectedSlotId = null;
+    });
+  }
+
+  Future<void> _reserve() async {
+    if (_selectedSlotId == null) return;
+    setState(() => _booking = true);
+    final response = await ReservationService.createReservation(
+      widget.restaurantId,
+      _selectedSlotId!,
+      _partySize,
+      '',
+    );
+    setState(() => _booking = false);
+    if (response['success'] == true) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Reserva creada exitosamente!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response['message'] ?? 'Error al reservar'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reservar en ${widget.restaurantName}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: darkColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Personas',
+                  style: TextStyle(fontSize: 14, color: darkColor),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        if (_partySize > 1) {
+                          setState(() => _partySize--);
+                          _loadSlots();
+                        }
+                      },
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    Text(
+                      '$_partySize',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() => _partySize++);
+                        _loadSlots();
+                      },
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Fecha',
+                  style: TextStyle(fontSize: 14, color: darkColor),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _date,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+                    if (picked != null) {
+                      setState(() => _date = picked);
+                      _loadSlots();
+                    }
+                  },
+                  child: Text(
+                    '${_date.day}/${_date.month}/${_date.year}',
+                    style: const TextStyle(
+                      color: primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Horarios disponibles',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: darkColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Center(
+                child: CircularProgressIndicator(color: primaryColor),
+              )
+            else if (_slots.isEmpty)
+              const Text(
+                'No hay disponibilidad para esta fecha',
+                style: TextStyle(color: Colors.grey),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                children: _slots.map((s) {
+                  final id = s['id'] as String;
+                  final time = s['timeSlot'] as String;
+                  final count = s['availableCount'] as int;
+                  final selected = _selectedSlotId == id;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedSlotId = id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: selected ? primaryColor : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${time.substring(0, 5)} ($count mesas)',
+                        style: TextStyle(
+                          color: selected ? Colors.white : darkColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _selectedSlotId == null || _booking
+                    ? null
+                    : _reserve,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: _booking
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Confirmar reserva',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
