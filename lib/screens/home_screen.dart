@@ -7,6 +7,7 @@ import 'search_screen.dart';
 import 'reservations_screen.dart';
 import 'profile_screen.dart';
 import 'split_bill_screen.dart';
+import 'favorites_screen.dart';
 
 const filters = ['Todos', 'Cerca', 'Descuentos', 'Abiertos', 'Tendencia'];
 
@@ -436,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomNav() {
     final items = [
       (Icons.home_rounded, 'Inicio'),
-      (Icons.search_rounded, 'Buscar'),
+      (Icons.favorite_outline, 'Favoritos'),
       (Icons.calendar_today_outlined, 'Reservas'),
       (Icons.receipt_outlined, 'Cuenta'),
       (Icons.person_outline_rounded, 'Perfil'),
@@ -452,7 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (i == 1)
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const SearchScreen()),
+              MaterialPageRoute(builder: (_) => const FavoritesScreen()),
             );
           if (i == 2)
             Navigator.push(
@@ -462,11 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (i == 3)
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const SplitBillScreen(
-                  restaurantName: 'Andrés Carne de Res',
-                ),
-              ),
+              MaterialPageRoute(builder: (_) => const FavoritesScreen()),
             );
           if (i == 4)
             Navigator.push(

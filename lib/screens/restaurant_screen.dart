@@ -1,21 +1,50 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/favorite_service.dart';
 
-class RestaurantScreen extends StatelessWidget {
+class RestaurantScreen extends StatefulWidget {
   final Map<String, dynamic> restaurant;
   const RestaurantScreen({super.key, required this.restaurant});
 
-  String get _name => restaurant['name'] ?? 'Restaurante';
-  String get _address => restaurant['address'] ?? 'Dirección no disponible';
-  String get _cuisine => restaurant['cuisine'] ?? 'Variado';
-  String get _rating => restaurant['rating'] ?? '-';
-  String get _priceRange => restaurant['priceRange'] ?? '-';
+  @override
+  State<RestaurantScreen> createState() => _RestaurantScreenState();
+}
+
+class _RestaurantScreenState extends State<RestaurantScreen> {
+  bool _isFavorite = false;
+
+  String get _name => widget.restaurant['name'] ?? 'Restaurante';
+  String get _address =>
+      widget.restaurant['address'] ?? 'Dirección no disponible';
+  String get _cuisine =>
+      widget.restaurant['cuisine'] ??
+      widget.restaurant['category'] ??
+      'Variado';
+  String get _rating => widget.restaurant['rating']?.toString() ?? '-';
+  String get _priceRange => widget.restaurant['priceRange'] ?? '-';
   String get _openingHours =>
-      restaurant['openingHours'] ?? 'Horario no disponible';
-  String get _phone => restaurant['phone'] ?? 'No disponible';
-  String get _website => restaurant['website'] ?? '';
-  String get _imageUrl =>
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop';
+      widget.restaurant['openingHours'] ?? 'Horario no disponible';
+  String get _phone => widget.restaurant['phone'] ?? 'No disponible';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFavorite();
+  }
+
+  Future<void> _checkFavorite() async {
+    final fav = await FavoriteService.isFavorite(_name);
+    setState(() => _isFavorite = fav);
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_isFavorite) {
+      await FavoriteService.removeFavorite(_name);
+    } else {
+      await FavoriteService.addFavorite(widget.restaurant);
+    }
+    setState(() => _isFavorite = !_isFavorite);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +72,7 @@ class RestaurantScreen extends StatelessWidget {
           height: 220,
           width: double.infinity,
           child: Image.network(
-            _imageUrl,
+            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
               height: 220,
@@ -78,6 +107,28 @@ class RestaurantScreen extends StatelessWidget {
                 Icons.arrow_back,
                 color: Colors.white,
                 size: 20,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 48,
+          right: 16,
+          child: GestureDetector(
+            onTap: _toggleFavorite,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _isFavorite
+                    ? primaryColor
+                    : Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: Colors.white,
+                size: 18,
               ),
             ),
           ),
