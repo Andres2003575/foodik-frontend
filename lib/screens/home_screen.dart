@@ -352,18 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => RestaurantScreen(
-                  restaurant: {
-                    'name': r['name'],
-                    'cuisine': r['category'],
-                    'rating': 4.5,
-                    'distance':
-                        '${(r['distanceKm'] as double?)?.toStringAsFixed(1) ?? '-'} km',
-                    'img':
-                        r['imageUrl'] ??
-                        'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
-                  },
-                ),
+                builder: (_) => RestaurantScreen(restaurant: r),
               ),
             ),
             child: Container(

@@ -251,7 +251,7 @@ class _AuthScreenState extends State<AuthScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Bienvenida de nuevo 👋',
+            'Te damos la bienvenida 👋',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
