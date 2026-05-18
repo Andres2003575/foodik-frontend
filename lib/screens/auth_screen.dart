@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -15,6 +16,8 @@ class _AuthScreenState extends State<AuthScreen>
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -34,6 +37,58 @@ class _AuthScreenState extends State<AuthScreen>
     super.dispose();
   }
 
+  Future<void> _handleLogin() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final response = await ApiService.login(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (response['data'] != null && response['data']['accessToken'] != null) {
+        await ApiService.saveToken(response['data']['accessToken']);
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(
+          () =>
+              _errorMessage = response['message'] ?? 'Error al iniciar sesión',
+        );
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'No se pudo conectar al servidor');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleRegister() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final response = await ApiService.register(
+        _nameController.text.trim(),
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (response['data'] != null && response['data']['accessToken'] != null) {
+        await ApiService.saveToken(response['data']['accessToken']);
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(
+          () => _errorMessage = response['message'] ?? 'Error al registrarse',
+        );
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'No se pudo conectar al servidor');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,9 +96,11 @@ class _AuthScreenState extends State<AuthScreen>
       body: Stack(
         children: [
           Positioned(
-            top: -60, right: -60,
+            top: -60,
+            right: -60,
             child: Container(
-              width: 250, height: 250,
+              width: 250,
+              height: 250,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFFFF6B35).withValues(alpha: 0.08),
@@ -51,9 +108,11 @@ class _AuthScreenState extends State<AuthScreen>
             ),
           ),
           Positioned(
-            top: 100, left: -80,
+            top: 100,
+            left: -80,
             child: Container(
-              width: 200, height: 200,
+              width: 200,
+              height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFFFFD166).withValues(alpha: 0.05),
@@ -66,7 +125,8 @@ class _AuthScreenState extends State<AuthScreen>
                 children: [
                   const SizedBox(height: 40),
                   Container(
-                    width: 80, height: 80,
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
@@ -82,7 +142,9 @@ class _AuthScreenState extends State<AuthScreen>
                         ),
                       ],
                     ),
-                    child: const Center(child: Text('🍽️', style: TextStyle(fontSize: 38))),
+                    child: const Center(
+                      child: Text('🍽️', style: TextStyle(fontSize: 38)),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   ShaderMask(
@@ -102,7 +164,11 @@ class _AuthScreenState extends State<AuthScreen>
                   const SizedBox(height: 6),
                   const Text(
                     'Tu compañero gastronómico',
-                    style: TextStyle(color: Colors.white38, fontSize: 13, letterSpacing: 1),
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 13,
+                      letterSpacing: 1,
+                    ),
                   ),
                   const SizedBox(height: 40),
                   Container(
@@ -135,7 +201,10 @@ class _AuthScreenState extends State<AuthScreen>
                             ),
                             labelColor: Colors.white,
                             unselectedLabelColor: Colors.grey[500],
-                            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            labelStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                             dividerColor: Colors.transparent,
                             tabs: const [
                               Tab(text: 'Iniciar sesión'),
@@ -143,52 +212,26 @@ class _AuthScreenState extends State<AuthScreen>
                             ],
                           ),
                         ),
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 13,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         SizedBox(
                           height: isLogin ? 320 : 400,
                           child: TabBarView(
                             controller: _tabController,
-                            children: [
-                              _buildLoginForm(),
-                              _buildRegisterForm(),
-                            ],
+                            children: [_buildLoginForm(), _buildRegisterForm()],
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Row(children: [
-                      Expanded(child: Container(height: 1, color: Colors.white12)),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('o continúa con', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                      ),
-                      Expanded(child: Container(height: 1, color: Colors.white12)),
-                    ]),
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.white12),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('G', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35))),
-                            SizedBox(width: 10),
-                            Text('Continuar con Google', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -207,37 +250,61 @@ class _AuthScreenState extends State<AuthScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Bienvenida de nuevo 👋',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-          const SizedBox(height: 4),
-          const Text('Ingresa tus datos para continuar',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 20),
-          _inputField(controller: _emailController, hint: 'Correo electrónico', icon: Icons.email_outlined),
-          const SizedBox(height: 12),
-          _inputField(controller: _passwordController, hint: 'Contraseña', icon: Icons.lock_outline, isPassword: true),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {},
-              child: const Text('¿Olvidaste tu contraseña?',
-                  style: TextStyle(color: Color(0xFFFF6B35), fontSize: 12)),
+          const Text(
+            'Bienvenida de nuevo 👋',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1A2E),
             ),
           ),
           const SizedBox(height: 4),
+          const Text(
+            'Ingresa tus datos para continuar',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          _inputField(
+            controller: _emailController,
+            hint: 'Correo electrónico',
+            icon: Icons.email_outlined,
+          ),
+          const SizedBox(height: 12),
+          _inputField(
+            controller: _passwordController,
+            hint: 'Contraseña',
+            icon: Icons.lock_outline,
+            isPassword: true,
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+              onPressed: _isLoading ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B35),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 4,
-                shadowColor: const Color(0xFFFF6B35).withValues(alpha: 0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: const Text('Ingresar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Ingresar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -251,31 +318,67 @@ class _AuthScreenState extends State<AuthScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Crea tu cuenta 🍽️',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
+          const Text(
+            'Crea tu cuenta 🍽️',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1A2E),
+            ),
+          ),
           const SizedBox(height: 4),
-          const Text('Únete a la comunidad Foodik',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text(
+            'Únete a la comunidad Foodik',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
           const SizedBox(height: 20),
-          _inputField(controller: _nameController, hint: 'Nombre completo', icon: Icons.person_outline),
+          _inputField(
+            controller: _nameController,
+            hint: 'Nombre completo',
+            icon: Icons.person_outline,
+          ),
           const SizedBox(height: 12),
-          _inputField(controller: _emailController, hint: 'Correo electrónico', icon: Icons.email_outlined),
+          _inputField(
+            controller: _emailController,
+            hint: 'Correo electrónico',
+            icon: Icons.email_outlined,
+          ),
           const SizedBox(height: 12),
-          _inputField(controller: _passwordController, hint: 'Contraseña', icon: Icons.lock_outline, isPassword: true),
+          _inputField(
+            controller: _passwordController,
+            hint: 'Contraseña',
+            icon: Icons.lock_outline,
+            isPassword: true,
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+              onPressed: _isLoading ? null : _handleRegister,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B35),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 4,
-                shadowColor: const Color(0xFFFF6B35).withValues(alpha: 0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: const Text('Crear cuenta', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Crear cuenta',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -299,10 +402,14 @@ class _AuthScreenState extends State<AuthScreen>
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: Colors.grey[400], size: 20,
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.grey[400],
+                  size: 20,
                 ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               )
             : null,
         filled: true,
@@ -311,7 +418,10 @@ class _AuthScreenState extends State<AuthScreen>
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }

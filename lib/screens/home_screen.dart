@@ -6,6 +6,7 @@ import 'reservations_screen.dart';
 import 'favorites_screen.dart';
 import 'profile_screen.dart';
 import 'split_bill_screen.dart';
+import '../services/api_service.dart';
 
 const filters = ['Todos', 'Cerca', 'Descuentos', 'Abiertos', 'Tendencia'];
 
@@ -46,43 +47,104 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('FOODIK', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryColor, letterSpacing: -0.5)),
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20)),
-              child: const Row(children: [
-                Icon(Icons.location_on, size: 14, color: primaryColor),
-                SizedBox(width: 4),
-                Text('Bogotá, Colombia', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-              ]),
+          const Text(
+            'FOODIK',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: primaryColor,
+              letterSpacing: -0.5,
             ),
-            const SizedBox(width: 8),
-            Stack(children: [
+          ),
+          Row(
+            children: [
               Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(18)),
-                child: const Icon(Icons.notifications_outlined, size: 18, color: Colors.black54),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.location_on, size: 14, color: primaryColor),
+                    SizedBox(width: 4),
+                    Text(
+                      'Bogotá, Colombia',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Positioned(
-                top: 8, right: 8,
-                child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: primaryColor, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Stack(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_outlined,
+                      size: 18,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          ]),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Widget _buildGreeting() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Buenas noches, Gaby 👋', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: darkColor)),
-        SizedBox(height: 2),
-        Text('¿Qué quieres comer hoy?', style: TextStyle(fontSize: 13, color: Colors.grey)),
-      ]),
+    return FutureBuilder<String>(
+      future: ApiService.getUserName(),
+      builder: (context, snapshot) {
+        final name = snapshot.data ?? 'Usuario';
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Buenas noches, $name 👋',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: darkColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                '¿Qué quieres comer hoy?',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -104,9 +166,24 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: active ? primaryColor : Colors.grey[100],
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: active ? [BoxShadow(color: primaryColor.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [],
               ),
-              child: Text(filters[i], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: active ? Colors.white : Colors.grey[500])),
+              child: Text(
+                filters[i],
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: active ? Colors.white : Colors.grey[500],
+                ),
+              ),
             ),
           );
         },
@@ -121,24 +198,63 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFf0fdf4), Color(0xFFecfdf5), Color(0xFFf0fdfa)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey[100]!),
       ),
-      child: Stack(children: [
-        ...List.generate(5, (i) => Positioned(top: (i + 1) * 25.0, left: 0, right: 0, child: Container(height: 1, color: Colors.grey.withValues(alpha: 0.15)))),
-        ...List.generate(4, (i) => Positioned(left: (i + 1) * 60.0, top: 0, bottom: 0, child: Container(width: 1, color: Colors.grey.withValues(alpha: 0.15)))),
-        _pin(0.30, 0.25), _pin(0.45, 0.60), _pin(0.55, 0.35), _pin(0.25, 0.72),
-        Positioned(
-          bottom: 10, right: 10,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(10)),
-            child: const Text('Ver mapa completo →', style: TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w500)),
+      child: Stack(
+        children: [
+          ...List.generate(
+            5,
+            (i) => Positioned(
+              top: (i + 1) * 25.0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 1,
+                color: Colors.grey.withValues(alpha: 0.15),
+              ),
+            ),
           ),
-        ),
-      ]),
+          ...List.generate(
+            4,
+            (i) => Positioned(
+              left: (i + 1) * 60.0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 1,
+                color: Colors.grey.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          _pin(0.30, 0.25),
+          _pin(0.45, 0.60),
+          _pin(0.55, 0.35),
+          _pin(0.25, 0.72),
+          Positioned(
+            bottom: 10,
+            right: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Ver mapa completo →',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -146,24 +262,60 @@ class _HomeScreenState extends State<HomeScreen> {
     return Positioned(
       top: 160 * top - 16,
       left: (MediaQuery.of(context).size.width - 40) * left - 16,
-      child: Column(children: [
-        Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle, boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.4), blurRadius: 8)]),
-          child: const Icon(Icons.navigation, size: 14, color: Colors.white),
-        ),
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.3), shape: BoxShape.circle)),
-      ]),
+      child: Column(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: primaryColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.navigation, size: 14, color: Colors.white),
+          ),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildNearbyHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('Cerca de ti', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: darkColor)),
-        const Text('Ver todos', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: primaryColor)),
-      ]),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Cerca de ti',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: darkColor,
+            ),
+          ),
+          const Text(
+            'Ver todos',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: primaryColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -176,50 +328,127 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, i) {
           final r = restaurants[i];
           return GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RestaurantScreen(restaurant: r))),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RestaurantScreen(restaurant: r),
+              ),
+            ),
             child: Container(
               width: 150,
               margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2))],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
                 border: Border.all(color: Colors.grey[50]!),
               ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Stack(children: [
-                    Image.network(r['img'] as String, height: 90, width: 150, fit: BoxFit.cover),
-                    if (r['discount'] != null)
-                      Positioned(
-                        top: 8, left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: secondaryColor, borderRadius: BorderRadius.circular(10)),
-                          child: Text(r['discount'] as String, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: darkColor)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          r['img'] as String,
+                          height: 90,
+                          width: 150,
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                  ]),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(r['name'] as String, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: darkColor)),
-                    const SizedBox(height: 2),
-                    Text(r['cuisine'] as String, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                    const SizedBox(height: 6),
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Row(children: [
-                        const Icon(Icons.star, size: 12, color: secondaryColor),
-                        const SizedBox(width: 2),
-                        Text('${r['rating']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: darkColor)),
-                      ]),
-                      Text(r['distance'] as String, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                    ]),
-                  ]),
-                ),
-              ]),
+                        if (r['discount'] != null)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: secondaryColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                r['discount'] as String,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: darkColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r['name'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: darkColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          r['cuisine'] as String,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  size: 12,
+                                  color: secondaryColor,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${r['rating']}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: darkColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              r['distance'] as String,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -236,15 +465,37 @@ class _HomeScreenState extends State<HomeScreen> {
       (Icons.person_outline_rounded, 'Perfil'),
     ];
     return Container(
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey[100]!))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey[100]!)),
+      ),
       child: BottomNavigationBar(
         currentIndex: activeNav,
         onTap: (i) {
           if (i == 0) return;
-          if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen()));
-          if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const ReservationsScreen()));
-          if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const SplitBillScreen(restaurantName: 'Andrés Carne de Res')));
-          if (i == 4) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+          if (i == 1)
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            );
+          if (i == 2)
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReservationsScreen()),
+            );
+          if (i == 3)
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SplitBillScreen(
+                  restaurantName: 'Andrés Carne de Res',
+                ),
+              ),
+            );
+          if (i == 4)
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
           setState(() => activeNav = i);
         },
         type: BottomNavigationBarType.fixed,
@@ -253,7 +504,14 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedFontSize: 10,
         unselectedFontSize: 10,
         elevation: 0,
-        items: items.map((item) => BottomNavigationBarItem(icon: Icon(item.$1, size: 22), label: item.$2)).toList(),
+        items: items
+            .map(
+              (item) => BottomNavigationBarItem(
+                icon: Icon(item.$1, size: 22),
+                label: item.$2,
+              ),
+            )
+            .toList(),
       ),
     );
   }
