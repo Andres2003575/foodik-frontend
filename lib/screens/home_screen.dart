@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/api_service.dart';
+import '../services/restaurant_service.dart';
 import 'restaurant_screen.dart';
 import 'search_screen.dart';
 import 'reservations_screen.dart';
-import 'favorites_screen.dart';
 import 'profile_screen.dart';
 import 'split_bill_screen.dart';
-import '../services/api_service.dart';
 
 const filters = ['Todos', 'Cerca', 'Descuentos', 'Abiertos', 'Tendencia'];
 
@@ -19,6 +19,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int activeFilter = 0;
   int activeNav = 0;
+  List<dynamic> _restaurants = [];
+  bool _loadingRestaurants = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRestaurants();
+  }
+
+  Future<void> _loadRestaurants() async {
+    final response = await RestaurantService.getRestaurants();
+    if (response['data'] != null) {
+      setState(() {
+        _restaurants = response['data']; // ← sin el ['content']
+        _loadingRestaurants = false;
+      });
+    } else {
+      setState(() => _loadingRestaurants = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 boxShadow: active
                     ? [
                         BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.3),
+                          color: primaryColor.withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -212,10 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
               top: (i + 1) * 25.0,
               left: 0,
               right: 0,
-              child: Container(
-                height: 1,
-                color: Colors.grey.withValues(alpha: 0.15),
-              ),
+              child: Container(height: 1, color: Colors.grey.withOpacity(0.15)),
             ),
           ),
           ...List.generate(
@@ -224,10 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
               left: (i + 1) * 60.0,
               top: 0,
               bottom: 0,
-              child: Container(
-                width: 1,
-                color: Colors.grey.withValues(alpha: 0.15),
-              ),
+              child: Container(width: 1, color: Colors.grey.withOpacity(0.15)),
             ),
           ),
           _pin(0.30, 0.25),
@@ -240,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.white.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
@@ -271,10 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: primaryColor,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                ),
+                BoxShadow(color: primaryColor.withOpacity(0.4), blurRadius: 8),
               ],
             ),
             child: const Icon(Icons.navigation, size: 14, color: Colors.white),
@@ -283,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: primaryColor.withValues(alpha: 0.3),
+              color: primaryColor.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
           ),
@@ -320,18 +331,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRestaurantCards() {
+    if (_loadingRestaurants) {
+      return const Expanded(
+        child: Center(child: CircularProgressIndicator(color: primaryColor)),
+      );
+    }
+    if (_restaurants.isEmpty) {
+      return const Expanded(
+        child: Center(child: Text('No hay restaurantes cercanos')),
+      );
+    }
     return Expanded(
       child: ListView.builder(
         padding: const EdgeInsets.only(left: 20, bottom: 16),
         scrollDirection: Axis.horizontal,
-        itemCount: restaurants.length,
+        itemCount: _restaurants.length,
         itemBuilder: (context, i) {
-          final r = restaurants[i];
+          final r = _restaurants[i];
           return GestureDetector(
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => RestaurantScreen(restaurant: r),
+                builder: (_) => RestaurantScreen(
+                  restaurant: {
+                    'name': r['name'],
+                    'cuisine': r['category'],
+                    'rating': 4.5,
+                    'distance':
+                        '${(r['distanceKm'] as double?)?.toStringAsFixed(1) ?? '-'} km',
+                    'img':
+                        r['imageUrl'] ??
+                        'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
+                  },
+                ),
               ),
             ),
             child: Container(
@@ -342,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withOpacity(0.06),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -356,38 +388,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(16),
                     ),
-                    child: Stack(
-                      children: [
-                        Image.network(
-                          r['img'] as String,
-                          height: 90,
-                          width: 150,
-                          fit: BoxFit.cover,
-                        ),
-                        if (r['discount'] != null)
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: secondaryColor,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                r['discount'] as String,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: darkColor,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                    child: Image.network(
+                      r['imageUrl'] ??
+                          'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
+                      height: 90,
+                      width: 150,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 90,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.restaurant, color: Colors.grey),
+                      ),
                     ),
                   ),
                   Padding(
@@ -396,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          r['name'] as String,
+                          r['name'] ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -407,42 +418,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          r['cuisine'] as String,
+                          r['category'] ?? '',
                           style: const TextStyle(
                             fontSize: 10,
                             color: Colors.grey,
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star,
-                                  size: 12,
-                                  color: secondaryColor,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${r['rating']}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: darkColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              r['distance'] as String,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          '${(r['distanceKm'] as double?)?.toStringAsFixed(1) ?? '-'} km',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),

@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Foodik necesita tu ubicación para mostrarte restaurantes cercanos</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Foodik necesita tu ubicación para mostrarte restaurantes cercanos</string>
 </dict>
 </plist>
