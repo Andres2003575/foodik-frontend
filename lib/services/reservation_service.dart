@@ -8,7 +8,7 @@ class ReservationService {
   static Future<Map<String, dynamic>> getMyReservations() async {
     final token = await ApiService.getToken();
     final response = await http.get(
-      Uri.parse('$_base/reservations/my'),
+      Uri.parse('$_base/reservations/my?page=0&size=50'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

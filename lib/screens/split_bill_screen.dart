@@ -1,33 +1,187 @@
 import 'package:flutter/material.dart';
-import 'payment_screen.dart';
+import '../main.dart';
+import '../services/bill_service.dart';
+import '../services/menu_service.dart';
+import '../services/user_service.dart';
+import '../services/api_service.dart';
+import '../services/reservation_service.dart';
 
 class SplitBillScreen extends StatefulWidget {
   final String restaurantName;
-  const SplitBillScreen({super.key, required this.restaurantName});
+  final String? reservationId;
+  final String? restaurantId;
+  const SplitBillScreen({
+    super.key,
+    required this.restaurantName,
+    this.reservationId,
+    this.restaurantId,
+  });
 
   @override
   State<SplitBillScreen> createState() => _SplitBillScreenState();
 }
 
 class _SplitBillScreenState extends State<SplitBillScreen> {
-  int selectedMode = 0;
+  int _selectedMode = 0;
+  List<dynamic> _menuItems = [];
+  List<Map<String, dynamic>> _selectedItems = [];
+  List<Map<String, dynamic>> _participants = [];
+  bool _loading = true;
+  bool _creating = false;
+  Map<String, dynamic>? _summary;
+  final _emailController = TextEditingController();
+  bool _searchingUser = false;
+  String? _searchError;
 
-  final modes = [
+  final modes = ['EQUAL', 'INDIVIDUAL', 'CHAINED'];
+  final modeLabels = [
     {'icon': '⚖️', 'label': 'Partes\niguales'},
     {'icon': '🧾', 'label': 'Cada uno\nlo suyo'},
     {'icon': '🔗', 'label': 'Cadena'},
   ];
 
-  final participants = [
-    {'name': 'Gaby M.', 'initial': 'G', 'color': 0xFFFF6B35, 'amount': 43500.0, 'paid': true},
-    {'name': 'Carlos R.', 'initial': 'C', 'color': 0xFF4ECDC4, 'amount': 43500.0, 'paid': false},
-    {'name': 'Laura S.', 'initial': 'L', 'color': 0xFF9B59B6, 'amount': 43500.0, 'paid': false},
-    {'name': 'Andrés P.', 'initial': 'A', 'color': 0xFF2ECC71, 'amount': 43500.0, 'paid': false},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadMenuAndUser();
+    if (widget.reservationId != null) _checkExistingBill();
+  }
 
-  double get total => participants.fold(0, (sum, p) => sum + (p['amount'] as double));
-  double get collected => participants.where((p) => p['paid'] as bool).fold(0, (sum, p) => sum + (p['amount'] as double));
-  double get pending => total - collected;
+  Future<void> _checkExistingBill() async {
+    final bill = await BillService.getBillByReservation(widget.reservationId!);
+    if (bill != null) {
+      setState(
+        () => _summary = {
+          'totalAmount': bill['totalAmount'],
+          'amountPerUser': {},
+          'existingBill': true,
+        },
+      );
+    }
+  }
+
+  Future<void> _loadMenuAndUser() async {
+    // Cargar usuario actual como primer participante
+    final me = await UserService.getMe();
+    if (me != null) {
+      setState(
+        () => _participants.add({
+          'id': me['id'],
+          'name': me['name'],
+          'email': me['email'],
+        }),
+      );
+    }
+    // Cargar menú
+    if (widget.restaurantId != null) {
+      final items = await MenuService.getMenu(widget.restaurantId!);
+      setState(() => _menuItems = items);
+    }
+    setState(() => _loading = false);
+  }
+
+  Future<void> _searchUser() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) return;
+    setState(() {
+      _searchingUser = true;
+      _searchError = null;
+    });
+    final user = await UserService.searchByEmail(email);
+    if (user != null) {
+      final exists = _participants.any((p) => p['id'] == user['id']);
+      if (!exists) {
+        setState(
+          () => _participants.add({
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+          }),
+        );
+        _emailController.clear();
+      } else {
+        setState(() => _searchError = 'Este usuario ya está en la lista');
+      }
+    } else {
+      setState(() => _searchError = 'Usuario no encontrado');
+    }
+    setState(() => _searchingUser = false);
+  }
+
+  void _addItem(Map<String, dynamic> item) {
+    setState(() {
+      final existing = _selectedItems.indexWhere(
+        (i) => i['menuItemId'] == item['id'],
+      );
+      if (existing >= 0) {
+        _selectedItems[existing]['quantity']++;
+      } else {
+        _selectedItems.add({
+          'menuItemId': item['id'],
+          'quantity': 1,
+          'name': item['name'],
+          'price': item['price'],
+        });
+      }
+    });
+  }
+
+  void _removeItem(String menuItemId) {
+    setState(() {
+      final existing = _selectedItems.indexWhere(
+        (i) => i['menuItemId'] == menuItemId,
+      );
+      if (existing >= 0) {
+        if (_selectedItems[existing]['quantity'] > 1) {
+          _selectedItems[existing]['quantity']--;
+        } else {
+          _selectedItems.removeAt(existing);
+        }
+      }
+    });
+  }
+
+  double get _total => _selectedItems.fold(
+    0,
+    (sum, i) => sum + (i['price'] as num) * (i['quantity'] as int),
+  );
+
+  Future<void> _createBill() async {
+    if (widget.reservationId == null || _selectedItems.isEmpty) return;
+    setState(() => _creating = true);
+    final items = _selectedItems
+        .map((i) => {'menuItemId': i['menuItemId'], 'quantity': i['quantity']})
+        .toList();
+    final response = await BillService.createBill(
+      widget.reservationId!,
+      modes[_selectedMode],
+      items,
+    );
+    if (response['success'] == true) {
+      final billId = response['data']['id'] as String;
+      final participantIds = _participants
+          .map((p) => p['id'] as String)
+          .toList();
+      final splitResponse = await BillService.splitBill(
+        billId,
+        modes[_selectedMode],
+        participantIds,
+      );
+      setState(() {
+        _summary = splitResponse['data'];
+        _creating = false;
+      });
+      print('SUMMARY: $_summary');
+    } else {
+      setState(() => _creating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response['message'] ?? 'Error al crear la cuenta'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,26 +196,12 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTotalCard(),
-                    const SizedBox(height: 24),
-                    _buildModeSelector(),
-                    const SizedBox(height: 24),
-                    _buildParticipants(context),
-                    const SizedBox(height: 20),
-                    _buildReminderButton(),
-                  ],
-                ),
-              ),
+              child: _summary != null ? _buildSummary() : _buildForm(),
             ),
           ),
         ],
       ),
-      bottomSheet: _buildBottomButton(context),
+      bottomSheet: _summary == null ? _buildBottomButton() : null,
     );
   }
 
@@ -75,23 +215,39 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                width: 36, height: 36,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: Colors.white.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
-            const Text('Dividir la cuenta',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Dividir la cuenta',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             Container(
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(Icons.receipt_outlined, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.receipt_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ],
         ),
@@ -99,276 +255,536 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
     );
   }
 
-  Widget _buildTotalCard() {
-    final paidCount = participants.where((p) => p['paid'] as bool).length;
-    final progress = collected / total;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A1A2E), Color(0xFF0F3460)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
+  Widget _buildForm() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.restaurant, size: 12, color: Colors.white70),
-                  const SizedBox(width: 4),
-                  Text(widget.restaurantName, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                ]),
-              ),
-              Text('$paidCount de ${participants.length} personas pagaron',
-                  style: const TextStyle(fontSize: 11, color: Colors.white54)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text('TOTAL DE LA CUENTA', style: TextStyle(fontSize: 11, color: Colors.white38, letterSpacing: 1)),
-          const SizedBox(height: 4),
           Text(
-            '\$${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-            style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900, color: Colors.white),
-          ),
-          const Text('Pesos colombianos (COP)', style: TextStyle(fontSize: 11, color: Colors.white38)),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.white12,
-              valueColor: const AlwaysStoppedAnimation(Color(0xFFFF6B35)),
-              minHeight: 6,
+            widget.restaurantName,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: darkColor,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
+
+          // Modo de división
+          const Text(
+            'Modo de división',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: darkColor,
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(modeLabels.length, (i) {
+              final selected = _selectedMode == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedMode = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: EdgeInsets.only(
+                      right: i < modeLabels.length - 1 ? 10 : 0,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: selected ? primaryColor : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: primaryColor.withOpacity(0.3),
+                                blurRadius: 10,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          modeLabels[i]['icon']!,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          modeLabels[i]['label']!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: selected ? Colors.white : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 24),
+
+          // Participantes
+          const Text(
+            'Participantes',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: darkColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._participants.map(
+            (p) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        p['name'][0].toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      p['name'],
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: darkColor,
+                      ),
+                    ),
+                  ),
+                  if (_participants.indexOf(p) > 0)
+                    GestureDetector(
+                      onTap: () => setState(() => _participants.remove(p)),
+                      child: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
             children: [
-              _progressLabel('Cobrado', collected, Colors.green),
-              _progressLabel('Pendiente', pending, const Color(0xFFFF6B35)),
+              Expanded(
+                child: TextField(
+                  controller: _emailController,
+                  decoration: InputDecoration(
+                    hintText: 'Agregar por email',
+                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    errorText: _searchError,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _searchingUser ? null : _searchUser,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: _searchingUser
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person_add,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 24),
+
+          // Platos
+          const Text(
+            'Platos',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: darkColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_loading)
+            const Center(child: CircularProgressIndicator(color: primaryColor))
+          else if (_menuItems.isEmpty)
+            const Text(
+              'Sin menú disponible',
+              style: TextStyle(color: Colors.grey),
+            )
+          else
+            ..._menuItems.map((item) {
+              final selected = _selectedItems.firstWhere(
+                (i) => i['menuItemId'] == item['id'],
+                orElse: () => {},
+              );
+              final qty = selected.isNotEmpty ? selected['quantity'] as int : 0;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: qty > 0
+                        ? primaryColor.withOpacity(0.3)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['name'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: darkColor,
+                            ),
+                          ),
+                          Text(
+                            '\$${item['price']}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if (qty > 0) ...[
+                          GestureDetector(
+                            onTap: () => _removeItem(item['id']),
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.remove, size: 16),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$qty',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        GestureDetector(
+                          onTap: () => _addItem(item),
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              color: primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          if (_selectedItems.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: darkColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '\$${_total.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: primaryColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _progressLabel(String label, double amount, Color color) {
-    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white38)),
-        Text('\$$formatted', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-      ],
-    );
-  }
-
-  Widget _buildModeSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Modo de división',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-        const SizedBox(height: 12),
-        Row(
-          children: List.generate(modes.length, (i) {
-            final selected = selectedMode == i;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => selectedMode = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: EdgeInsets.only(right: i < modes.length - 1 ? 10 : 0),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(
-                    color: selected ? const Color(0xFFFF6B35) : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: selected
-                        ? [BoxShadow(color: const Color(0xFFFF6B35).withValues(alpha: 0.3), blurRadius: 10)]
-                        : [],
+  Widget _buildSummary() {
+    final isExisting = _summary?['existingBill'] == true;
+    final amountPerUser = _summary?['amountPerUser'] as Map? ?? {};
+    final total = _summary?['totalAmount'] ?? 0;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Resumen de la cuenta',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: darkColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _summary?['existingBill'] == true
+                ? 'Estado: Completada ✓'
+                : 'Modo: ${modes[_selectedMode]}',
+            style: TextStyle(
+              fontSize: 13,
+              color: _summary?['existingBill'] == true
+                  ? Colors.green
+                  : Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: darkColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  child: Column(
+                ),
+                Text(
+                  '\$$total',
+                  style: const TextStyle(
+                    color: primaryColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (isExisting)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Ya existe una cuenta para esta reserva. El resumen fue calculado anteriormente.',
+                style: TextStyle(color: Colors.orange, fontSize: 12),
+              ),
+            ),
+          const SizedBox(height: 12),
+          ...amountPerUser.entries.map((entry) {
+            final userId = entry.key as String;
+            final amount = entry.value;
+            final participant = _participants.firstWhere(
+              (p) => p['id'] == userId,
+              orElse: () => {'name': 'Usuario'},
+            );
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Text(modes[i]['icon']!, style: const TextStyle(fontSize: 22)),
-                      const SizedBox(height: 6),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          color: primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            (participant['name'] as String)[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Text(
-                        modes[i]['label']!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: selected ? Colors.white : Colors.grey[600],
+                        participant['name'] as String,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: darkColor,
                         ),
                       ),
                     ],
                   ),
-                ),
+                  Text(
+                    '\$$amount',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: primaryColor,
+                    ),
+                  ),
+                ],
               ),
             );
           }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildParticipants(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Participantes',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-            Text('Cada uno: \$${(total / participants.length).toStringAsFixed(0)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...participants.map((p) => _buildParticipantRow(context, p)),
-      ],
-    );
-  }
-
-  Widget _buildParticipantRow(BuildContext context, Map<String, dynamic> p) {
-    final paid = p['paid'] as bool;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: paid ? Colors.green.withValues(alpha: 0.2) : Colors.transparent),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: Color(p['color'] as int).withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(p['initial'] as String,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(p['color'] as int))),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Text(p['name'] as String,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E))),
-                  if (p['name'] == 'Gaby M.')
-                    Container(
-                      margin: const EdgeInsets.only(left: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF6B35).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text('tú', style: TextStyle(fontSize: 9, color: Color(0xFFFF6B35), fontWeight: FontWeight.bold)),
-                    ),
-                ]),
-                const SizedBox(height: 2),
-                Row(children: [
-                  Icon(paid ? Icons.check_circle : Icons.radio_button_unchecked,
-                      size: 12, color: paid ? Colors.green : Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(paid ? '✓ Pagado' : '⏳ Pendiente',
-                      style: TextStyle(fontSize: 11, color: paid ? Colors.green : Colors.grey)),
-                ]),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$${(p['amount'] as double).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
-              ),
-              if (!paid)
-                GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => PaymentScreen(
-                      personName: p['name'] as String,
-                      amount: p['amount'] as double,
-                    )),
-                  ),
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B35),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text('Pagar', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
-            ],
+              ),
+              child: const Text(
+                '¡Cuenta saldada! 🎉',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReminderButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () {},
-        icon: const Icon(Icons.notifications_outlined, size: 18),
-        label: const Text('Enviar recordatorios'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF1A1A2E),
-          side: BorderSide(color: Colors.grey[300]!),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomButton(BuildContext context) {
-    final pendingCount = participants.where((p) => !(p['paid'] as bool)).length;
+  Widget _buildBottomButton() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, -4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () {},
+          onPressed: _selectedItems.isEmpty || _creating ? null : _createBill,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A1A2E),
+            backgroundColor: darkColor,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
-          child: Text(
-            pendingCount > 0 ? 'Cerrar cuenta · $pendingCount pendientes' : '¡Cuenta saldada! 🎉',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-          ),
+          child: _creating
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  _selectedItems.isEmpty
+                      ? 'Selecciona platos para continuar'
+                      : 'Crear cuenta · \$${_total.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
       ),
     );

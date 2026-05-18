@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/reservation_service.dart';
+import 'split_bill_screen.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
@@ -31,6 +32,7 @@ class _ReservationsScreenState extends State<ReservationsScreen>
 
   Future<void> _loadReservations() async {
     final response = await ReservationService.getMyReservations();
+    print('RESERVATIONS RESPONSE: $response');
     final content = response['data']?['content'] as List? ?? [];
     setState(() {
       _active = content
@@ -80,12 +82,25 @@ class _ReservationsScreenState extends State<ReservationsScreen>
   }
 
   Widget _buildHeader() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 4),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.arrow_back, size: 20, color: darkColor),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
             'Mis reservas',
             style: TextStyle(
               fontSize: 26,
@@ -93,8 +108,8 @@ class _ReservationsScreenState extends State<ReservationsScreen>
               color: darkColor,
             ),
           ),
-          SizedBox(height: 2),
-          Text(
+          const SizedBox(height: 2),
+          const Text(
             'Gestiona tus próximas visitas',
             style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
@@ -183,6 +198,7 @@ class _ReservationsScreenState extends State<ReservationsScreen>
     final time = r['reservationTime'] ?? '';
     final partySize = r['partySize'] ?? 0;
     final id = r['id'] ?? '';
+    final restaurantId = r['restaurantId'] ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -275,23 +291,57 @@ class _ReservationsScreenState extends State<ReservationsScreen>
                 ),
                 if (!isPast) ...[
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () => _cancel(id),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _cancel(id),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: const Text(
+                            'Cancelar',
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      child: const Text(
-                        'Cancelar reserva',
-                        style: TextStyle(fontSize: 13),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SplitBillScreen(
+                                restaurantName: restaurantName,
+                                reservationId: id,
+                                restaurantId: restaurantId,
+                              ),
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Dividir cuenta',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ],
