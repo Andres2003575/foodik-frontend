@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/favorite_service.dart';
+import '../services/menu_service.dart';
 import '../services/reservation_service.dart';
 
 class RestaurantScreen extends StatefulWidget {
@@ -13,6 +14,8 @@ class RestaurantScreen extends StatefulWidget {
 
 class _RestaurantScreenState extends State<RestaurantScreen> {
   bool _isFavorite = false;
+  List<dynamic> _menuItems = [];
+  bool _loadingMenu = false;
 
   String get _name => widget.restaurant['name'] ?? 'Restaurante';
   String get _address =>
@@ -32,6 +35,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   void initState() {
     super.initState();
     _checkFavorite();
+    if (_isRegistered) _loadMenu();
   }
 
   Future<void> _checkFavorite() async {
@@ -46,6 +50,17 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
       await FavoriteService.addFavorite(widget.restaurant);
     }
     setState(() => _isFavorite = !_isFavorite);
+  }
+
+  Future<void> _loadMenu() async {
+    final id = widget.restaurant['id'] as String?;
+    if (id == null) return;
+    setState(() => _loadingMenu = true);
+    final items = await MenuService.getMenu(id);
+    setState(() {
+      _menuItems = items;
+      _loadingMenu = false;
+    });
   }
 
   void _showReservationSheet() {
@@ -74,6 +89,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
             _buildInfo(),
             _buildStatsRow(),
             _buildStatusCard(),
+            if (_isRegistered) _buildMenu(),
             if (_isRegistered) _buildReserveButton(),
             const SizedBox(height: 32),
           ],
@@ -343,6 +359,117 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenu() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 0, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(right: 20),
+            child: Text(
+              'Menú',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: darkColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_loadingMenu)
+            const Center(child: CircularProgressIndicator(color: primaryColor))
+          else if (_menuItems.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(right: 20),
+              child: Text(
+                'Sin menú disponible',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            SizedBox(
+              height: 140,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _menuItems.length,
+                itemBuilder: (context, i) {
+                  final item = _menuItems[i];
+                  return Container(
+                    width: 130,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                        ),
+                      ],
+                      border: Border.all(color: Colors.grey[100]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(16),
+                          ),
+                          child: Image.network(
+                            item['imageUrl'] ??
+                                'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300&h=200&fit=crop',
+                            height: 80,
+                            width: 130,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              height: 80,
+                              color: Colors.grey[200],
+                              child: const Icon(
+                                Icons.fastfood,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['name'] ?? '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: darkColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '\$${item['price']?.toString() ?? ''}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
