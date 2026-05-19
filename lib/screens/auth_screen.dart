@@ -49,7 +49,14 @@ class _AuthScreenState extends State<AuthScreen>
       );
       if (response['data'] != null && response['data']['accessToken'] != null) {
         await ApiService.saveToken(response['data']['accessToken']);
-        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+        final role = response['data']['user']['role'];
+        if (mounted) {
+          if (role == 'RESTAURANT_ADMIN') {
+            Navigator.pushReplacementNamed(context, '/admin');
+          } else {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        }
       } else {
         setState(
           () =>
@@ -76,7 +83,14 @@ class _AuthScreenState extends State<AuthScreen>
       );
       if (response['data'] != null && response['data']['accessToken'] != null) {
         await ApiService.saveToken(response['data']['accessToken']);
-        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+        final role = response['data']['user']['role'];
+        if (mounted) {
+          if (role == 'RESTAURANT_ADMIN') {
+            Navigator.pushReplacementNamed(context, '/admin');
+          } else {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        }
       } else {
         setState(
           () => _errorMessage = response['message'] ?? 'Error al registrarse',

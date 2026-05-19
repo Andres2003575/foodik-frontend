@@ -15,6 +15,31 @@ class ApiService {
     return prefs.getString('access_token');
   }
 
+  static Future<void> saveBillSummary(
+    String reservationId,
+    Map<String, dynamic> summary,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('bill_summary_$reservationId', jsonEncode(summary));
+    print(
+      'GUARDADO: bill_summary_$reservationId = ${jsonEncode(summary).substring(0, 50)}',
+    );
+  }
+
+  static Future<Map<String, dynamic>?> getBillSummary(
+    String reservationId,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('bill_summary_$reservationId');
+    if (raw == null) return null;
+    return jsonDecode(raw);
+  }
+
+  static Future<void> deleteBillSummary(String reservationId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('bill_summary_$reservationId');
+  }
+
   static Future<Map<String, dynamic>> login(
     String email,
     String password,

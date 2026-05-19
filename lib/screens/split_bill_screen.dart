@@ -50,12 +50,18 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
   Future<void> _checkExistingBill() async {
     final bill = await BillService.getBillByReservation(widget.reservationId!);
     if (bill != null) {
+      final savedSummary = await ApiService.getBillSummary(
+        widget.reservationId!,
+      );
+      print('SAVED SUMMARY: $savedSummary');
       setState(
-        () => _summary = {
-          'totalAmount': bill['totalAmount'],
-          'amountPerUser': {},
-          'existingBill': true,
-        },
+        () => _summary =
+            savedSummary ??
+            {
+              'totalAmount': bill['totalAmount'],
+              'amountPerUser': {},
+              'existingBill': true,
+            },
       );
     }
   }
@@ -175,6 +181,13 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
         modes[_selectedMode],
         participantIds,
       );
+      if (widget.reservationId != null && splitResponse['data'] != null) {
+        await ApiService.saveBillSummary(
+          widget.reservationId!,
+          splitResponse['data'],
+        );
+        print('SUMMARY SAVED FOR: ${widget.reservationId}');
+      }
       setState(() {
         _summary = splitResponse['data'];
         _creating = false;
@@ -839,7 +852,12 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () async {
+                if (widget.reservationId != null) {
+                  await ApiService.deleteBillSummary(widget.reservationId!);
+                }
+                Navigator.pop(context);
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
