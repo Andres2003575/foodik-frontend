@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../main.dart';
 import '../services/api_service.dart';
 import '../services/restaurant_service.dart';
+import '../config/secrets.dart';
 import 'restaurant_screen.dart';
-import 'search_screen.dart';
 import 'reservations_screen.dart';
 import 'favorites_screen.dart';
 import 'profile_screen.dart';
@@ -120,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Buenas noches, $name 👋',
+                'Hola, $name 👋',
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -144,89 +145,35 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       height: 160,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFf0fdf4), Color(0xFFecfdf5), Color(0xFFf0fdfa)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey[100]!),
       ),
-      child: Stack(
-        children: [
-          ...List.generate(
-            5,
-            (i) => Positioned(
-              top: (i + 1) * 25.0,
-              left: 0,
-              right: 0,
-              child: Container(height: 1, color: Colors.grey.withOpacity(0.15)),
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: GoogleMap(
+          initialCameraPosition: const CameraPosition(
+            target: LatLng(4.711, -74.0721),
+            zoom: 14,
           ),
-          ...List.generate(
-            4,
-            (i) => Positioned(
-              left: (i + 1) * 60.0,
-              top: 0,
-              bottom: 0,
-              child: Container(width: 1, color: Colors.grey.withOpacity(0.15)),
-            ),
-          ),
-          _pin(0.30, 0.25),
-          _pin(0.45, 0.60),
-          _pin(0.55, 0.35),
-          _pin(0.25, 0.72),
-          Positioned(
-            bottom: 10,
-            right: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                'Ver mapa completo →',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w500,
+          markers: _restaurants
+              .where((r) => r['latitude'] != null && r['longitude'] != null)
+              .map(
+                (r) => Marker(
+                  markerId: MarkerId(
+                    r['osmId']?.toString() ?? r['id']?.toString() ?? r['name'],
+                  ),
+                  position: LatLng(
+                    r['latitude'] as double,
+                    r['longitude'] as double,
+                  ),
+                  infoWindow: InfoWindow(title: r['name']),
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pin(double top, double left) {
-    return Positioned(
-      top: 160 * top - 16,
-      left: (MediaQuery.of(context).size.width - 40) * left - 16,
-      child: Column(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: primaryColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: primaryColor.withOpacity(0.4), blurRadius: 8),
-              ],
-            ),
-            child: const Icon(Icons.navigation, size: 14, color: Colors.white),
-          ),
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ],
+              )
+              .toSet(),
+          myLocationEnabled: true,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+        ),
       ),
     );
   }
