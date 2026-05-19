@@ -61,7 +61,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
   }
 
   Future<void> _loadMenuAndUser() async {
-    // Cargar usuario actual como primer participante
     final me = await UserService.getMe();
     if (me != null) {
       setState(
@@ -72,7 +71,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
         }),
       );
     }
-    // Cargar menú
     if (widget.restaurantId != null) {
       final items = await MenuService.getMenu(widget.restaurantId!);
       setState(() => _menuItems = items);
@@ -108,10 +106,12 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
     setState(() => _searchingUser = false);
   }
 
-  void _addItem(Map<String, dynamic> item) {
+  void _addItem(Map<String, dynamic> item, {String? assignedUserId}) {
     setState(() {
       final existing = _selectedItems.indexWhere(
-        (i) => i['menuItemId'] == item['id'],
+        (i) =>
+            i['menuItemId'] == item['id'] &&
+            i['assignedUserId'] == assignedUserId,
       );
       if (existing >= 0) {
         _selectedItems[existing]['quantity']++;
@@ -121,6 +121,7 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
           'quantity': 1,
           'name': item['name'],
           'price': item['price'],
+          'assignedUserId': assignedUserId,
         });
       }
     });
@@ -150,7 +151,14 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
     if (widget.reservationId == null || _selectedItems.isEmpty) return;
     setState(() => _creating = true);
     final items = _selectedItems
-        .map((i) => {'menuItemId': i['menuItemId'], 'quantity': i['quantity']})
+        .map(
+          (i) => {
+            'menuItemId': i['menuItemId'],
+            'quantity': i['quantity'],
+            if (i['assignedUserId'] != null)
+              'assignedUserId': i['assignedUserId'],
+          },
+        )
         .toList();
     final response = await BillService.createBill(
       widget.reservationId!,
@@ -171,7 +179,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
         _summary = splitResponse['data'];
         _creating = false;
       });
-      print('SUMMARY: $_summary');
     } else {
       setState(() => _creating = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -270,8 +277,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Modo de división
           const Text(
             'Modo de división',
             style: TextStyle(
@@ -286,7 +291,10 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
               final selected = _selectedMode == i;
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => setState(() => _selectedMode = i),
+                  onTap: () => setState(() {
+                    _selectedMode = i;
+                    _selectedItems.clear();
+                  }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: EdgeInsets.only(
@@ -329,8 +337,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
             }),
           ),
           const SizedBox(height: 24),
-
-          // Participantes
           const Text(
             'Participantes',
             style: TextStyle(
@@ -442,8 +448,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Platos
           const Text(
             'Platos',
             style: TextStyle(
@@ -462,11 +466,13 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
             )
           else
             ..._menuItems.map((item) {
-              final selected = _selectedItems.firstWhere(
-                (i) => i['menuItemId'] == item['id'],
-                orElse: () => {},
+              final selectedForItem = _selectedItems
+                  .where((i) => i['menuItemId'] == item['id'])
+                  .toList();
+              final qty = selectedForItem.fold(
+                0,
+                (sum, i) => sum + (i['quantity'] as int),
               );
-              final qty = selected.isNotEmpty ? selected['quantity'] as int : 0;
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(12),
@@ -479,58 +485,83 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
                         : Colors.transparent,
                   ),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['name'] ?? '',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: darkColor,
-                            ),
-                          ),
-                          Text(
-                            '\$${item['price']}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: primaryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     Row(
                       children: [
-                        if (qty > 0) ...[
-                          GestureDetector(
-                            onTap: () => _removeItem(item['id']),
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                shape: BoxShape.circle,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['name'] ?? '',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: darkColor,
+                                ),
                               ),
-                              child: const Icon(Icons.remove, size: 16),
-                            ),
+                              Text(
+                                '\$${item['price']}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$qty',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
+                        ),
                         GestureDetector(
-                          onTap: () => _addItem(item),
+                          onTap: () async {
+                            if (modes[_selectedMode] == 'INDIVIDUAL' &&
+                                _participants.length > 1) {
+                              final selected = await showDialog<String>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text(
+                                    '¿Para quién es este plato?',
+                                  ),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: _participants
+                                        .map(
+                                          (p) => ListTile(
+                                            leading: Container(
+                                              width: 32,
+                                              height: 32,
+                                              decoration: const BoxDecoration(
+                                                color: primaryColor,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  p['name'][0].toUpperCase(),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            title: Text(p['name']),
+                                            onTap: () => Navigator.pop(
+                                              context,
+                                              p['id'] as String,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                              );
+                              if (selected != null)
+                                _addItem(item, assignedUserId: selected);
+                            } else {
+                              _addItem(item);
+                            }
+                          },
                           child: Container(
                             width: 28,
                             height: 28,
@@ -547,6 +578,94 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
                         ),
                       ],
                     ),
+                    if (qty > 0 && modes[_selectedMode] == 'INDIVIDUAL') ...[
+                      const SizedBox(height: 8),
+                      ..._participants.map((p) {
+                        final pItems = _selectedItems
+                            .where(
+                              (i) =>
+                                  i['menuItemId'] == item['id'] &&
+                                  i['assignedUserId'] == p['id'],
+                            )
+                            .toList();
+                        final pQty = pItems.isEmpty
+                            ? 0
+                            : pItems.first['quantity'] as int;
+                        if (pQty == 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                p['name'],
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _removeItem(item['id']),
+                                    child: Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.remove, size: 12),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Text(
+                                      '$pQty',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ] else if (qty > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () => _removeItem(item['id']),
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.remove, size: 12),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              '$qty',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -606,14 +725,12 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            _summary?['existingBill'] == true
+            isExisting
                 ? 'Estado: Completada ✓'
                 : 'Modo: ${modes[_selectedMode]}',
             style: TextStyle(
               fontSize: 13,
-              color: _summary?['existingBill'] == true
-                  ? Colors.green
-                  : Colors.grey[500],
+              color: isExisting ? Colors.green : Colors.grey[500],
             ),
           ),
           const SizedBox(height: 20),
@@ -654,7 +771,7 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'Ya existe una cuenta para esta reserva. El resumen fue calculado anteriormente.',
+                'Ya existe una cuenta para esta reserva.',
                 style: TextStyle(color: Colors.orange, fontSize: 12),
               ),
             ),
