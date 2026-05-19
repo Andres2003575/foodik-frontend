@@ -3,6 +3,7 @@ import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/admin_screen.dart';
+import 'screens/bills_screen.dart';
 
 void main() {
   runApp(const FoodikApp());
@@ -31,6 +32,7 @@ class FoodikApp extends StatelessWidget {
         '/auth': (_) => const AuthScreen(),
         '/home': (_) => const HomeScreen(),
         '/admin': (_) => const AdminScreen(),
+        '/bills': (_) => const BillsScreen(),
       },
     );
   }

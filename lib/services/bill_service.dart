@@ -47,6 +47,19 @@ class BillService {
     return jsonDecode(response.body);
   }
 
+  static Future<List<dynamic>> getMyBills() async {
+    final token = await ApiService.getToken();
+    final response = await http.get(
+      Uri.parse('$_base/bills/my'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    final data = jsonDecode(response.body);
+    return data['data'] ?? [];
+  }
+
   static Future<Map<String, dynamic>?> getBillByReservation(
     String reservationId,
   ) async {

@@ -5,9 +5,9 @@ import '../services/restaurant_service.dart';
 import 'restaurant_screen.dart';
 import 'search_screen.dart';
 import 'reservations_screen.dart';
-import 'profile_screen.dart';
-import 'split_bill_screen.dart';
 import 'favorites_screen.dart';
+import 'profile_screen.dart';
+import 'bills_screen.dart';
 
 const filters = ['Todos', 'Cerca', 'Descuentos', 'Abiertos', 'Tendencia'];
 
@@ -422,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          r['category'] ?? '',
+                          r['category'] ?? r['cuisine'] ?? '',
                           style: const TextStyle(
                             fontSize: 10,
                             color: Colors.grey,
@@ -453,7 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (Icons.home_rounded, 'Inicio'),
       (Icons.favorite_outline, 'Favoritos'),
       (Icons.calendar_today_outlined, 'Reservas'),
-      (Icons.receipt_outlined, 'Cuenta'),
+      (Icons.receipt_outlined, 'Cuentas'),
       (Icons.person_outline_rounded, 'Perfil'),
     ];
     return Container(
@@ -477,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (i == 3)
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+              MaterialPageRoute(builder: (_) => const BillsScreen()),
             );
           if (i == 4)
             Navigator.push(
