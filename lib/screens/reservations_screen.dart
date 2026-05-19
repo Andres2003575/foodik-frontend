@@ -179,15 +179,16 @@ class _ReservationsScreenState extends State<ReservationsScreen>
     final status = r['status'] as String;
     final isPast = status == 'COMPLETED' || status == 'CANCELLED';
     final isActive = status == 'CONFIRMED';
+    final isPending = status == 'PENDING';
 
     Color statusColor = isActive
         ? Colors.green
-        : status == 'PENDING'
+        : isPending
         ? primaryColor
         : Colors.grey;
     String statusLabel = isActive
         ? '● Confirmada'
-        : status == 'PENDING'
+        : isPending
         ? '⏰ Pendiente'
         : status == 'COMPLETED'
         ? '✓ Completada'
@@ -293,54 +294,56 @@ class _ReservationsScreenState extends State<ReservationsScreen>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _cancel(id),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      if (isPending)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _cancel(id),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          child: const Text(
-                            'Cancelar',
-                            style: TextStyle(fontSize: 13),
+                            child: const Text(
+                              'Cancelar',
+                              style: TextStyle(fontSize: 13),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SplitBillScreen(
-                                restaurantName: restaurantName,
-                                reservationId: id,
-                                restaurantId: restaurantId,
+                      if (isPending) const SizedBox(width: 10),
+                      if (isActive)
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SplitBillScreen(
+                                  restaurantName: restaurantName,
+                                  reservationId: id,
+                                  restaurantId: restaurantId,
+                                ),
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Dividir cuenta',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Dividir cuenta',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],

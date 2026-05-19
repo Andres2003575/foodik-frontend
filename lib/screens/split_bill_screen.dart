@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../main.dart';
 import '../services/bill_service.dart';
 import '../services/menu_service.dart';
@@ -43,26 +44,50 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMenuAndUser();
-    if (widget.reservationId != null) _checkExistingBill();
+    _loadMenuAndUserThenCheck();
+  }
+
+  Future<void> _loadMenuAndUserThenCheck() async {
+    await _loadMenuAndUser();
+    if (widget.reservationId != null) await _checkExistingBill();
   }
 
   Future<void> _checkExistingBill() async {
     final bill = await BillService.getBillByReservation(widget.reservationId!);
     if (bill != null) {
-      final savedSummary = await ApiService.getBillSummary(
-        widget.reservationId!,
-      );
-      print('SAVED SUMMARY: $savedSummary');
-      setState(
-        () => _summary =
-            savedSummary ??
-            {
-              'totalAmount': bill['totalAmount'],
-              'amountPerUser': {},
-              'existingBill': true,
-            },
-      );
+      final splitResult = bill['splitResult'];
+      if (splitResult != null) {
+        final Map<String, dynamic> amountPerUser = jsonDecode(splitResult);
+        // Cargar nombres de participantes que no están en la lista
+        for (final userId in amountPerUser.keys) {
+          final exists = _participants.any((p) => p['id'] == userId);
+          if (!exists) {
+            final user = await UserService.getUserById(userId);
+            if (user != null) {
+              _participants.add({
+                'id': user['id'],
+                'name': user['name'],
+                'email': user['email'],
+              });
+            }
+          }
+        }
+        setState(
+          () => _summary = {
+            'totalAmount': bill['totalAmount'],
+            'amountPerUser': amountPerUser,
+            'existingBill': true,
+          },
+        );
+      } else {
+        setState(
+          () => _summary = {
+            'totalAmount': bill['totalAmount'],
+            'amountPerUser': {},
+            'existingBill': true,
+          },
+        );
+      }
     }
   }
 
@@ -181,13 +206,6 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
         modes[_selectedMode],
         participantIds,
       );
-      if (widget.reservationId != null && splitResponse['data'] != null) {
-        await ApiService.saveBillSummary(
-          widget.reservationId!,
-          splitResponse['data'],
-        );
-        print('SUMMARY SAVED FOR: ${widget.reservationId}');
-      }
       setState(() {
         _summary = splitResponse['data'];
         _creating = false;
@@ -852,12 +870,7 @@ class _SplitBillScreenState extends State<SplitBillScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () async {
-                if (widget.reservationId != null) {
-                  await ApiService.deleteBillSummary(widget.reservationId!);
-                }
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,

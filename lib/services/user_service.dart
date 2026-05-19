@@ -32,6 +32,20 @@ class UserService {
     return data['data'] as Map<String, dynamic>?;
   }
 
+  static Future<Map<String, dynamic>?> getUserById(String userId) async {
+    final token = await ApiService.getToken();
+    final response = await http.get(
+      Uri.parse('$_base/users/$userId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    final data = jsonDecode(response.body);
+    if (data['success'] == true) return data['data'];
+    return null;
+  }
+
   static Future<void> logout() async {
     await ApiService.saveToken('');
   }
