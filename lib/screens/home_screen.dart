@@ -9,8 +9,6 @@ import 'favorites_screen.dart';
 import 'profile_screen.dart';
 import 'bills_screen.dart';
 
-const filters = ['Todos', 'Cerca', 'Descuentos', 'Abiertos', 'Tendencia'];
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -18,7 +16,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int activeFilter = 0;
   int activeNav = 0;
   List<dynamic> _restaurants = [];
   bool _loadingRestaurants = true;
@@ -65,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildTopBar(),
             _buildGreeting(),
-            _buildFilters(),
             _buildMap(),
             _buildNearbyHeader(),
             _buildRestaurantCards(),
@@ -91,62 +87,22 @@ class _HomeScreenState extends State<HomeScreen> {
               letterSpacing: -0.5,
             ),
           ),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.location_on, size: 14, color: primaryColor),
+                SizedBox(width: 4),
+                Text(
+                  'Bogotá, Colombia',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.location_on, size: 14, color: primaryColor),
-                    SizedBox(width: 4),
-                    Text(
-                      'Bogotá, Colombia',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Stack(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Icon(
-                      Icons.notifications_outlined,
-                      size: 18,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: primaryColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -180,49 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildFilters() {
-    return SizedBox(
-      height: 38,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        itemCount: filters.length,
-        itemBuilder: (context, i) {
-          final active = activeFilter == i;
-          return GestureDetector(
-            onTap: () => setState(() => activeFilter = i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: active ? primaryColor : Colors.grey[100],
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                          color: primaryColor.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : [],
-              ),
-              child: Text(
-                filters[i],
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : Colors.grey[500],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 

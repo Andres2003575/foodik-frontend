@@ -117,10 +117,12 @@ class _BillsScreenState extends State<BillsScreen>
           color: primaryColor,
           borderRadius: BorderRadius.circular(14),
         ),
+        indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.grey[500],
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         dividerColor: Colors.transparent,
+        padding: const EdgeInsets.all(4),
         tabs: const [
           Tab(text: 'Pendientes'),
           Tab(text: 'Pagadas'),

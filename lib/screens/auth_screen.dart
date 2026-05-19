@@ -213,6 +213,7 @@ class _AuthScreenState extends State<AuthScreen>
                               color: const Color(0xFFFF6B35),
                               borderRadius: BorderRadius.circular(14),
                             ),
+                            indicatorSize: TabBarIndicatorSize.tab,
                             labelColor: Colors.white,
                             unselectedLabelColor: Colors.grey[500],
                             labelStyle: const TextStyle(
@@ -220,6 +221,7 @@ class _AuthScreenState extends State<AuthScreen>
                               fontSize: 14,
                             ),
                             dividerColor: Colors.transparent,
+                            padding: const EdgeInsets.all(4),
                             tabs: const [
                               Tab(text: 'Iniciar sesión'),
                               Tab(text: 'Registrarse'),
