@@ -4,8 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'api_service.dart';
 
 class RestaurantService {
-  static const String _base = ApiService.baseUrl;
-
+  static final String _base = ApiService.baseUrl;
   static Future<Position> _getLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) throw Exception('GPS desactivado');

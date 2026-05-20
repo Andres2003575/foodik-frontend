@@ -3,8 +3,7 @@ import 'package:http/http.dart' as http;
 import 'api_service.dart';
 
 class MenuService {
-  static const String _base = ApiService.baseUrl;
-
+  static final String _base = ApiService.baseUrl;
   static Future<List<dynamic>> getMenu(String restaurantId) async {
     final token = await ApiService.getToken();
     final response = await http.get(

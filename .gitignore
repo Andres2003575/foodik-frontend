@@ -47,3 +47,4 @@ app.*.map.json
 # API Keys
 lib/config/secrets.dart
 ios/Runner/Secrets.swift
+android/local.properties
