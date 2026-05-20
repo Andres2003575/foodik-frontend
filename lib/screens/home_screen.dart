@@ -28,29 +28,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRestaurants() async {
-    final position = await RestaurantService.getCurrentPosition();
-    final scraping = await RestaurantService.getRestaurants();
-    final registered = await RestaurantService.getRegisteredRestaurants(
-      lat: position.latitude,
-      lng: position.longitude,
-    );
+    try {
+      final position = await RestaurantService.getCurrentPosition();
+      final scraping = await RestaurantService.getRestaurants();
+      final registered = await RestaurantService.getRegisteredRestaurants(
+        lat: position.latitude,
+        lng: position.longitude,
+      );
 
-    final scrapingList = (scraping['data'] as List? ?? [])
-        .map(
-          (r) => Map<String, dynamic>.from(r as Map)..['isRegistered'] = false,
-        )
-        .toList();
+      final scrapingList = (scraping['data'] as List? ?? [])
+          .map(
+            (r) =>
+                Map<String, dynamic>.from(r as Map)..['isRegistered'] = false,
+          )
+          .toList();
 
-    final registeredList = ((registered['data']?['content']) as List? ?? [])
-        .map(
-          (r) => Map<String, dynamic>.from(r as Map)..['isRegistered'] = true,
-        )
-        .toList();
+      final registeredList = ((registered['data']?['content']) as List? ?? [])
+          .map(
+            (r) => Map<String, dynamic>.from(r as Map)..['isRegistered'] = true,
+          )
+          .toList();
 
-    setState(() {
-      _restaurants = [...registeredList, ...scrapingList];
-      _loadingRestaurants = false;
-    });
+      setState(() {
+        _restaurants = [...registeredList, ...scrapingList];
+        _loadingRestaurants = false;
+      });
+    } catch (e) {
+      print('ERROR _loadRestaurants: $e');
+      setState(() => _loadingRestaurants = false);
+    }
   }
 
   @override
